@@ -27,7 +27,16 @@ def load_model():
         
         model_response = requests.get(model_url)
         label_encoders_response = requests.get(label_encoders_url)
-        
+        if model_response.status_code == 200 and label_encoders_response.status_code == 200:
+            model = pickle.load(BytesIO(model_response.content))
+            label_encoders = pickle.load(BytesIO(label_encoders_response.content))
+            st.success("Model loaded successfully from GitHub!")
+            return model, label_encoders
+        else:
+            raise FileNotFoundError("Model files not found on GitHub")
+            
+    except Exception as e:
+        st.warning("Model files not found. Training a new model with your data...")        
         
         # Load from downloaded content
         model = pickle.load(BytesIO(model_response.content))
@@ -278,4 +287,5 @@ elif app_mode == "About":
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python, Streamlit, and Scikit-learn")
+
 
