@@ -4,57 +4,23 @@ import pickle
 from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 import seaborn as sns
-import requests
-from io import BytesIO
+
+# Load the data
+df = pd.read_csv(r"C:\Users\nitis\Analysis_Project\laptop_price_prediction\.ipynb_checkpoints\cleaned_laptop_prices.csv")
 
 # Set page config
 st.set_page_config(page_title="Laptop Price Predictor", page_icon="💻", layout="wide")
 
-# Load data from GitHub
+# Load data and models
 @st.cache_data
 def load_data():
-    # Use GitHub raw URL instead of local path
-    url = "https://raw.githubusercontent.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/cleaned_laptop_prices.csv"
-    return pd.read_csv(url)
+    return pd.read_csv(r'C:\Users\nitis\Analysis_Project\laptop_price_prediction\.ipynb_checkpoints\cleaned_laptop_prices.csv')
 
-# Load model from GitHub (you'll need to upload your model files to GitHub)
 @st.cache_resource
 def load_model():
-    try:
-        # Try to load from GitHub (you'll need to upload your model files)
-        model_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/laptop_model1.pkl"
-        label_encoders_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/label_encoders1.pkl"
-        
-        # Download model files
-        model_response = requests.get(model_url)
-        label_encoders_response = requests.get(label_encoders_url)
-        
-        # Load from downloaded content
-        model = pickle.load(BytesIO(model_response.content))
-        label_encoders = pickle.load(BytesIO(label_encoders_response.content))
-        
-        return model, label_encoders
-    except:
-        st.warning("Model files not found. Using demo mode with sample data.")
-        # Create a simple demo model for demonstration
-        from sklearn.ensemble import RandomForestRegressor
-        from sklearn.preprocessing import LabelEncoder
-        
-        # Load data to create a simple model
-        df = load_data()
-        
-        # Select only numeric columns for demo
-        numeric_cols = ['Inches', 'Ram', 'Weight', 'Price_euros']
-        demo_df = df[numeric_cols].dropna()
-        
-        # Create a simple model
-        model = RandomForestRegressor(n_estimators=10, random_state=42)
-        model.fit(demo_df[['Inches', 'Ram', 'Weight']], demo_df['Price_euros'])
-        
-        # Create dummy label encoders
-        label_encoders = {}
-        
-        return model, label_encoders
+    model = pickle.load(open('laptop_model1.pkl', 'rb'))
+    label_encoders = pickle.load(open('label_encoders1.pkl', 'rb'))
+    return model, label_encoders
 
 df = load_data()
 model, label_encoders = load_model()
@@ -83,11 +49,11 @@ if app_mode == "Price Prediction":
         # Advanced specifications
         st.subheader("Advanced Specifications")
         cpu = st.selectbox('CPU Brand', sorted(df['CPU_company'].unique()))
-        cpu_model = st.text_input('CPU Model (e.g., Core i5, Ryzen 7)', 'Core i5')
+        cpu_model = st.text_input('CPU Model (e.g., Core i5, Ryzen 7)')
         storage = st.select_slider('Primary Storage (GB)', options=[32, 64, 128, 256, 512, 1024, 2048], value=256)
         storage_type = st.selectbox('Storage Type', ['SSD', 'HDD', 'Flash Storage', 'Hybrid'])
         gpu = st.selectbox('GPU Brand', sorted(df['GPU_company'].unique()))
-        gpu_model = st.text_input('GPU Model (e.g., GTX 1050, Radeon RX 580)', 'Integrated')
+        gpu_model = st.text_input('GPU Model (e.g., GTX 1050, Radeon RX 580)')
         os = st.selectbox('Operating System', sorted(df['OS'].unique()))
     
     # Additional features
@@ -118,18 +84,23 @@ if app_mode == "Price Prediction":
         'Screen': [resolution]
     })
     
+    # Encode categorical variables
+    for col in ['Company', 'TypeName', 'CPU_company', 'GPU_company', 'OS', 'PrimaryStorageType', 'Screen']:
+        if col in label_encoders:
+            input_data[col] = label_encoders[col].transform(input_data[col])
+
     # EURO TO RUPEE CONVERSION RATE
     EURO_TO_RUPEE_RATE = 90.0  # Update this with current rate
     
+    
     # Predict button with enhanced styling
+        
     if st.button('Predict Price', type="primary", help="Click to predict the laptop price based on your specifications"):
         try:
-            # For demo purposes, we'll use a simplified prediction
-            # In a real scenario, you would use your trained model with all features
-            
-            # Simple prediction based on basic features (demo only)
-            demo_features = ['Inches', 'Ram', 'Weight']
-            prediction_input = input_data[demo_features]
+            # Select only the features used in the model
+            model_features = ['Company', 'TypeName', 'Inches', 'Ram', 'Weight', 
+                            'CPU_company', 'PrimaryStorage', 'GPU_company']
+            prediction_input = input_data[model_features]
             
             prediction = model.predict(prediction_input)
             euro_price = prediction[0]
@@ -146,6 +117,7 @@ if app_mode == "Price Prediction":
             
             # Exchange rate information
             st.info(f"*Conversion rate: 1€ = ₹{EURO_TO_RUPEE_RATE} (approximate)*")
+            
             
             # Show similar laptops from dataset
             st.subheader("Similar Laptops in Our Database")
@@ -165,7 +137,6 @@ if app_mode == "Price Prediction":
                 
         except Exception as e:
             st.error(f"An error occurred during prediction: {str(e)}")
-            st.info("This is a demo version. For full functionality, please upload your model files to GitHub.")
 
 elif app_mode == "Data Exploration":
     st.title('📊 Laptop Data Exploration')
@@ -278,5 +249,3 @@ elif app_mode == "About":
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python, Streamlit, and Scikit-learn")
-
-
