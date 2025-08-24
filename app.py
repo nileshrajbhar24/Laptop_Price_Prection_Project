@@ -21,13 +21,13 @@ def load_data():
 @st.cache_resource
 def load_model():
     try:
-        # Try to load from GitHub (you'll need to upload your model files)
-        model_url = "https://github.com/your-username/your-repo/raw/main/laptop_model1.pkl"
-        label_encoders_url = "https://github.com/your-username/your-repo/raw/main/label_encoders1.pkl"
+        # Try to load from GitHub first
+        model_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/laptop_model1.pkl"
+        label_encoders_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/label_encoders1.pkl"
         
-        # Download model files
         model_response = requests.get(model_url)
         label_encoders_response = requests.get(label_encoders_url)
+        
         
         # Load from downloaded content
         model = pickle.load(BytesIO(model_response.content))
@@ -278,3 +278,4 @@ elif app_mode == "About":
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python, Streamlit, and Scikit-learn")
+
