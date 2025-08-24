@@ -6,10 +6,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
 from io import BytesIO
-import numpy as np
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, r2_score
 
 # Set page config
 st.set_page_config(page_title="Laptop Price Predictor", page_icon="💻", layout="wide")
@@ -21,69 +17,42 @@ def load_data():
     url = "https://raw.githubusercontent.com/nileshrajbhar24/Laptop_Price_Prection_Project/refs/heads/main/cleaned_laptop_prices.csv"
     return pd.read_csv(url)
 
-# Load model from GitHub
+# Load model from GitHub (you'll need to upload your model files to GitHub)
 @st.cache_resource
 def load_model():
     try:
-        # Model URLs - use the exact URLs you copied from GitHub
-        model_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/raw/main/laptop_model1.pkl"
-        label_encoders_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/raw/main/label_encoders1.pkl"
+        # Try to load from GitHub (you'll need to upload your model files)
+        model_url = "https://github.com/your-username/your-repo/raw/main/laptop_model1.pkl"
+        label_encoders_url = "https://github.com/your-username/your-repo/raw/main/label_encoders1.pkl"
         
         # Download model files
         model_response = requests.get(model_url)
         label_encoders_response = requests.get(label_encoders_url)
-        
-        # Check if files were found
-        if model_response.status_code != 200:
-            st.error(f"Model file not found at: {model_url}")
-            raise FileNotFoundError("Model file not found")
-            
-        if label_encoders_response.status_code != 200:
-            st.error(f"Label encoders file not found at: {label_encoders_url}")
-            raise FileNotFoundError("Label encoders file not found")
         
         # Load from downloaded content
         model = pickle.load(BytesIO(model_response.content))
         label_encoders = pickle.load(BytesIO(label_encoders_response.content))
         
         return model, label_encoders
+    except:
+        st.warning("Model files not found. Using demo mode with sample data.")
+        # Create a simple demo model for demonstration
+        from sklearn.ensemble import RandomForestRegressor
+        from sklearn.preprocessing import LabelEncoder
         
-    except Exception as e:
-        st.warning(f"Could not load model files: {str(e)}. Training a new model with your data...")
-        
-        # Train a new model
+        # Load data to create a simple model
         df = load_data()
         
-        # Preprocess the data
-        df_model = df.copy()
+        # Select only numeric columns for demo
+        numeric_cols = ['Inches', 'Ram', 'Weight', 'Price_euros']
+        demo_df = df[numeric_cols].dropna()
         
-        # Encode categorical variables
-        categorical_cols = ['Company', 'TypeName', 'CPU_company', 'GPU_company', 'OS']
+        # Create a simple model
+        model = RandomForestRegressor(n_estimators=10, random_state=42)
+        model.fit(demo_df[['Inches', 'Ram', 'Weight']], demo_df['Price_euros'])
+        
+        # Create dummy label encoders
         label_encoders = {}
-        
-        for col in categorical_cols:
-            le = LabelEncoder()
-            df_model[col] = le.fit_transform(df_model[col].astype(str))
-            label_encoders[col] = le
-        
-        # Select features and target
-        features = ['Company', 'TypeName', 'Inches', 'Ram', 'Weight', 'CPU_company']
-        X = df_model[features]
-        y = df_model['Price_euros']
-        
-        # Split the data
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
-        # Train the model
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X_train, y_train)
-        
-        # Evaluate the model
-        y_pred = model.predict(X_test)
-        mae = mean_absolute_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        
-        st.success(f"New model trained successfully! MAE: €{mae:.2f}, R²: {r2:.3f}")
         
         return model, label_encoders
 
@@ -155,22 +124,13 @@ if app_mode == "Price Prediction":
     # Predict button with enhanced styling
     if st.button('Predict Price', type="primary", help="Click to predict the laptop price based on your specifications"):
         try:
-            # Encode categorical variables for prediction
-            input_data_encoded = input_data.copy()
-            for col in ['Company', 'TypeName', 'CPU_company']:
-                if col in label_encoders:
-                    # Handle unseen labels by using the most common label
-                    try:
-                        input_data_encoded[col] = label_encoders[col].transform(input_data_encoded[col])
-                    except ValueError:
-                        # If label not seen during training, use the first available label
-                        input_data_encoded[col] = 0
+            # For demo purposes, we'll use a simplified prediction
+            # In a real scenario, you would use your trained model with all features
             
-            # Select features for prediction
-            features = ['Company', 'TypeName', 'Inches', 'Ram', 'Weight', 'CPU_company']
-            prediction_input = input_data_encoded[features]
+            # Simple prediction based on basic features (demo only)
+            demo_features = ['Inches', 'Ram', 'Weight']
+            prediction_input = input_data[demo_features]
             
-            # Make prediction
             prediction = model.predict(prediction_input)
             euro_price = prediction[0]
             rupee_price = euro_price * EURO_TO_RUPEE_RATE
@@ -205,7 +165,7 @@ if app_mode == "Price Prediction":
                 
         except Exception as e:
             st.error(f"An error occurred during prediction: {str(e)}")
-            st.info("Please check if all required features are available in the model.")
+            st.info("This is a demo version. For full functionality, please upload your model files to GitHub.")
 
 elif app_mode == "Data Exploration":
     st.title('📊 Laptop Data Exploration')
