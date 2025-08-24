@@ -137,11 +137,8 @@ if app_mode == "Price Prediction":
         'Inches': [inches],
         'Ram': [ram],
         'Weight': [weight],
-        'CPU_company': [cpu],
         'CPU_model': [cpu_model],
-        'PrimaryStorage': [storage],
         'PrimaryStorageType': [storage_type],
-        'GPU_company': [gpu],
         'GPU_model': [gpu_model],
         'OS': [os],
         'Touchscreen': [touchscreen],
@@ -158,7 +155,7 @@ if app_mode == "Price Prediction":
         try:
             # Encode categorical variables for prediction
             input_data_encoded = input_data.copy()
-            for col in ['Company', 'TypeName', 'CPU_company']:
+            for col in ['Company', 'TypeName']:
                 if col in label_encoders:
                     # Handle unseen labels by using the most common label
                     try:
@@ -168,7 +165,7 @@ if app_mode == "Price Prediction":
                         input_data_encoded[col] = 0
             
             # Select features for prediction
-            features = ['Company', 'TypeName', 'Inches', 'Ram', 'Weight', 'CPU_company']
+            features = ['Company', 'TypeName', 'Inches', 'Ram', 'Weight']
             prediction_input = input_data_encoded[features]
             
             # Make prediction
@@ -319,3 +316,4 @@ elif app_mode == "About":
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python, Streamlit, and Scikit-learn")
+
