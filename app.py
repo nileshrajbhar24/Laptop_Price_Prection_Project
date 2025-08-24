@@ -1,10 +1,14 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+import warnings
+warnings.filterwarnings('ignore')
 
 # Set page config
 st.set_page_config(page_title="Laptop Price Predictor", page_icon="💻", layout="wide")
@@ -15,42 +19,100 @@ def load_data():
     url = "https://raw.githubusercontent.com/nileshrajbhar24/Laptop_Price_Prection_Project/refs/heads/main/cleaned_laptop_prices.csv"
     return pd.read_csv(url)
 
-# Train a simple model with ALL required features
+# Enhanced feature engineering
+def engineer_features(df):
+    df_eng = df.copy()
+    
+    # Create screen size categories
+    df_eng['Screen_Size_Category'] = pd.cut(df_eng['Inches'], 
+                                           bins=[0, 13, 15, 17, 100], 
+                                           labels=['Small', 'Medium', 'Large', 'Extra Large'])
+    
+    # Create RAM categories
+    df_eng['RAM_Category'] = pd.cut(df_eng['Ram'], 
+                                   bins=[0, 4, 8, 16, 100], 
+                                   labels=['Low', 'Medium', 'High', 'Very High'])
+    
+    # Create storage categories
+    df_eng['Storage_Category'] = pd.cut(df_eng['PrimaryStorage'], 
+                                       bins=[0, 256, 512, 1000, 10000], 
+                                       labels=['Low', 'Medium', 'High', 'Very High'])
+    
+    # Create performance score (simple heuristic)
+    df_eng['Performance_Score'] = (df_eng['Ram'] / 8) + (df_eng['PrimaryStorage'] / 512) + (df_eng['Inches'] / 15)
+    
+    return df_eng
+
+# Train an improved model with better features
 @st.cache_resource
-def train_model(df):
-    # Create a simple model with all required features
-    df_model = df.copy()
+def train_improved_model(df):
+    # Engineer features
+    df_eng = engineer_features(df)
     
     # Encode categorical variables
     label_encoders = {}
-    categorical_cols = ['Company', 'TypeName', 'CPU_company', 'GPU_company', 'OS']
+    categorical_cols = ['Company', 'TypeName', 'CPU_company', 'GPU_company', 'OS', 
+                       'Screen_Size_Category', 'RAM_Category', 'Storage_Category']
     
     for col in categorical_cols:
-        le = LabelEncoder()
-        df_model[col] = le.fit_transform(df_model[col].astype(str))
-        label_encoders[col] = le
+        if col in df_eng.columns:
+            le = LabelEncoder()
+            df_eng[col] = le.fit_transform(df_eng[col].astype(str))
+            label_encoders[col] = le
     
-    # Select features and target - include ALL features the model needs
-    features = ['Company', 'TypeName', 'Inches', 'Ram', 'Weight', 'CPU_company', 'GPU_company', 'PrimaryStorage']
-    X = df_model[features]
-    y = df_model['Price_euros']
+    # Select features and target
+    features = [
+        'Company', 'TypeName', 'Inches', 'Ram', 'Weight', 'CPU_company', 
+        'GPU_company', 'PrimaryStorage', 'Screen_Size_Category', 
+        'RAM_Category', 'Storage_Category', 'Performance_Score'
+    ]
     
-    # Train the model
-    model = RandomForestRegressor(n_estimators=50, random_state=42)
-    model.fit(X, y)
+    # Only use features that exist in the dataframe
+    features = [f for f in features if f in df_eng.columns]
     
-    return model, label_encoders
+    X = df_eng[features]
+    y = df_eng['Price_euros']
+    
+    # Split the data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Train the model with optimized parameters
+    model = RandomForestRegressor(
+        n_estimators=200, 
+        max_depth=15, 
+        min_samples_split=5, 
+        min_samples_leaf=2, 
+        random_state=42
+    )
+    model.fit(X_train, y_train)
+    
+    # Evaluate the model
+    y_pred = model.predict(X_test)
+    mae = mean_absolute_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    
+    # Store evaluation metrics
+    model_metrics = {
+        'mae': mae,
+        'r2': r2,
+        'features': features
+    }
+    
+    return model, label_encoders, model_metrics
 
 # Load data and train model
 df = load_data()
-model, label_encoders = train_model(df)
+model, label_encoders, model_metrics = train_improved_model(df)
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-app_mode = st.sidebar.radio("Choose a page", ["Price Prediction", "Data Exploration", "About"])
+app_mode = st.sidebar.radio("Choose a page", ["Price Prediction", "Data Exploration", "Model Info", "About"])
 
 if app_mode == "Price Prediction":
     st.title('💻 Laptop Price Predictor')
+    
+    # Display model performance
+    st.info(f"Model Performance: MAE = €{model_metrics['mae']:.2f}, R² = {model_metrics['r2']:.3f}")
     
     # Create two columns for better layout
     col1, col2 = st.columns(2)
@@ -75,6 +137,15 @@ if app_mode == "Price Prediction":
     
     if st.button('Predict Price', type="primary"):
         try:
+            # Calculate derived features
+            screen_size_cat = pd.cut([inches], bins=[0, 13, 15, 17, 100], 
+                                    labels=['Small', 'Medium', 'Large', 'Extra Large'])[0]
+            ram_cat = pd.cut([ram], bins=[0, 4, 8, 16, 100], 
+                            labels=['Low', 'Medium', 'High', 'Very High'])[0]
+            storage_cat = pd.cut([storage], bins=[0, 256, 512, 1000, 10000], 
+                                labels=['Low', 'Medium', 'High', 'Very High'])[0]
+            performance_score = (ram / 8) + (storage / 512) + (inches / 15)
+            
             # Prepare input data with ALL required features
             input_data = pd.DataFrame({
                 'Company': [company],
@@ -83,17 +154,34 @@ if app_mode == "Price Prediction":
                 'Ram': [ram],
                 'Weight': [weight],
                 'CPU_company': [cpu],
-                'GPU_company': [gpu],  # This was missing before
-                'PrimaryStorage': [storage]  # This was missing before
+                'GPU_company': [gpu],
+                'PrimaryStorage': [storage],
+                'Screen_Size_Category': [screen_size_cat],
+                'RAM_Category': [ram_cat],
+                'Storage_Category': [storage_cat],
+                'Performance_Score': [performance_score]
             })
             
             # Encode categorical variables
             input_data_encoded = input_data.copy()
-            for col in ['Company', 'TypeName', 'CPU_company', 'GPU_company']:
-                input_data_encoded[col] = label_encoders[col].transform(input_data_encoded[col])
+            for col in label_encoders.keys():
+                if col in input_data_encoded.columns:
+                    try:
+                        input_data_encoded[col] = label_encoders[col].transform(input_data_encoded[col])
+                    except ValueError:
+                        # If label not seen during training, use the first available label
+                        input_data_encoded[col] = 0
+            
+            # Make sure we have all the features the model expects
+            for feature in model_metrics['features']:
+                if feature not in input_data_encoded.columns:
+                    input_data_encoded[feature] = 0
+            
+            # Select only the features the model was trained on
+            prediction_input = input_data_encoded[model_metrics['features']]
             
             # Make prediction
-            prediction = model.predict(input_data_encoded)
+            prediction = model.predict(prediction_input)
             euro_price = prediction[0]
             rupee_price = euro_price * EURO_TO_RUPEE_RATE
             
@@ -101,27 +189,41 @@ if app_mode == "Price Prediction":
             col1, col2 = st.columns(2)
             with col1:
                 st.success(f"### Predicted Price (Euros)\n€{euro_price:,.2f}")
+                st.metric("Mean Absolute Error", f"€{model_metrics['mae']:.2f}")
             with col2:
                 st.success(f"### Predicted Price (Rupees)\n₹{rupee_price:,.2f}")
+                st.metric("R² Score", f"{model_metrics['r2']:.3f}")
             
             st.info(f"*Conversion rate: 1€ = ₹{EURO_TO_RUPEE_RATE}*")
             
             # Show similar laptops
-            st.subheader("Similar Laptops")
+            st.subheader("Similar Laptops in Database")
             similar = df[
                 (df['Company'] == company) & 
                 (df['TypeName'] == type_name) & 
-                (df['Ram'] == ram)
+                (df['Ram'] == ram) &
+                (df['PrimaryStorage'] == storage)
             ].head(5)
             
             if not similar.empty:
                 similar['Price_rupees'] = similar['Price_euros'] * EURO_TO_RUPEE_RATE
-                st.dataframe(similar[['Company', 'TypeName', 'Ram', 'Inches', 'Price_euros', 'Price_rupees']])
+                st.dataframe(similar[['Company', 'TypeName', 'Ram', 'Inches', 'PrimaryStorage', 'Price_euros', 'Price_rupees']])
             else:
-                st.info("No similar laptops found in our database.")
+                # Show broader similarity if exact match not found
+                similar = df[
+                    (df['Company'] == company) & 
+                    (df['TypeName'] == type_name)
+                ].head(5)
+                if not similar.empty:
+                    st.info("Showing similar laptops from the same brand and type:")
+                    similar['Price_rupees'] = similar['Price_euros'] * EURO_TO_RUPEE_RATE
+                    st.dataframe(similar[['Company', 'TypeName', 'Ram', 'Inches', 'PrimaryStorage', 'Price_euros', 'Price_rupees']])
+                else:
+                    st.info("No similar laptops found in our database.")
                 
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
+            st.write("Please try adjusting your specifications.")
 
 elif app_mode == "Data Exploration":
     st.title('📊 Laptop Data Exploration')
@@ -151,11 +253,17 @@ elif app_mode == "Data Exploration":
             max_value=int(df['Ram'].max()),
             value=(int(df['Ram'].min()), int(df['Ram'].max()))
         )
+        selected_types = st.multiselect(
+            "Select Types",
+            options=df['TypeName'].unique(),
+            default=df['TypeName'].unique()[:2]
+        )
     
     filtered_df = df[
         (df['Price_euros'].between(min_price, max_price)) &
         (df['Company'].isin(selected_brands)) &
-        (df['Ram'].between(min_ram, max_ram))
+        (df['Ram'].between(min_ram, max_ram)) &
+        (df['TypeName'].isin(selected_types))
     ]
     
     st.write(f"Showing {len(filtered_df)} laptops")
@@ -180,6 +288,7 @@ elif app_mode == "Data Exploration":
         sns.barplot(x=brand_avg.index, y=brand_avg.values, ax=ax)
         ax.set_title('Average Price by Brand')
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_ylabel('Average Price (€)')
         st.pyplot(fig)
         
     with tab3:
@@ -192,10 +301,35 @@ elif app_mode == "Data Exploration":
             numeric_df.corr(),
             annot=True,
             cmap='coolwarm',
+            center=0,
             ax=ax
         )
         ax.set_title('Feature Correlations')
         st.pyplot(fig)
+
+elif app_mode == "Model Info":
+    st.title('🤖 Model Information')
+    
+    st.subheader("Model Performance")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Mean Absolute Error", f"€{model_metrics['mae']:.2f}")
+    with col2:
+        st.metric("R² Score", f"{model_metrics['r2']:.3f}")
+    
+    st.subheader("Features Used for Prediction")
+    st.write("The model uses the following features to predict laptop prices:")
+    for i, feature in enumerate(model_metrics['features'], 1):
+        st.write(f"{i}. {feature}")
+    
+    st.subheader("How to Improve Accuracy")
+    st.markdown("""
+    1. **More Data**: Add more laptop examples to the dataset
+    2. **Better Features**: Include more detailed specifications like CPU model, GPU model, etc.
+    3. **Hyperparameter Tuning**: Optimize model parameters further
+    4. **Feature Engineering**: Create more informative derived features
+    5. **Different Algorithms**: Try other regression algorithms like Gradient Boosting or Neural Networks
+    """)
 
 elif app_mode == "About":
     st.title('ℹ️ About This Project')
@@ -208,6 +342,7 @@ elif app_mode == "About":
     ### Features:
     - **Price Prediction**: Estimate laptop prices based on specifications
     - **Data Exploration**: Explore the dataset with filters and visualizations
+    - **Model Information**: View model performance and details
     - **Similar Products**: Find similar laptops in our database
     
     ### How It Works:
@@ -220,8 +355,9 @@ elif app_mode == "About":
     
     ### Model Information:
     - Algorithm: Random Forest Regressor
-    - Features used: Brand, Type, Screen Size, RAM, Weight, CPU, GPU, Storage
+    - Features used: Brand, Type, Screen Size, RAM, Weight, CPU, GPU, Storage, and engineered features
     """)
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python and Streamlit")
+
