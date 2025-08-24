@@ -14,7 +14,7 @@ st.set_page_config(page_title="Laptop Price Predictor", page_icon="💻", layout
 @st.cache_data
 def load_data():
     # Use GitHub raw URL instead of local path
-    url = "https://raw.githubusercontent.com/nileshrajbhar24/Laptop_Price_Prection_Project/refs/heads/main/cleaned_laptop_prices.csv"
+    url = "https://raw.githubusercontent.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/cleaned_laptop_prices.csv"
     return pd.read_csv(url)
 
 # Load model from GitHub (you'll need to upload your model files to GitHub)
@@ -22,8 +22,8 @@ def load_data():
 def load_model():
     try:
         # Try to load from GitHub (you'll need to upload your model files)
-        model_url = "https://github.com/your-username/your-repo/raw/main/laptop_model1.pkl"
-        label_encoders_url = "https://github.com/your-username/your-repo/raw/main/label_encoders1.pkl"
+        model_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/laptop_model1.pkl"
+        label_encoders_url = "https://github.com/nileshrajbhar24/Laptop_Price_Prection_Project/blob/main/label_encoders1.pkl"
         
         # Download model files
         model_response = requests.get(model_url)
@@ -278,4 +278,5 @@ elif app_mode == "About":
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python, Streamlit, and Scikit-learn")
+
 
