@@ -46,7 +46,6 @@ def load_model():
         model = pickle.load(BytesIO(model_response.content))
         label_encoders = pickle.load(BytesIO(label_encoders_response.content))
         
-        st.success("Model loaded successfully from GitHub!")
         return model, label_encoders
         
     except Exception as e:
@@ -319,3 +318,4 @@ elif app_mode == "About":
     
     st.markdown("---")
     st.markdown("Created with ❤️ using Python, Streamlit, and Scikit-learn")
+
